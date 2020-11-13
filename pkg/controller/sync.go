@@ -90,7 +90,7 @@ func (c *Controller) checkContainer(ctx context.Context, log *logrus.Entry, pod 
 
 	c.metrics.AddImage(pod.Namespace, pod.Name,
 		container.Name, result.ImageURL, result.IsLatest,
-		result.CurrentVersion, result.LatestVersion)
+		result.CurrentVersion, result.LatestVersion, result.OS, result.Architecture)
 
 	return nil
 }

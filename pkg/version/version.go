@@ -9,9 +9,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jetstack/version-checker/pkg/api"
-	"github.com/jetstack/version-checker/pkg/client"
-
 	"github.com/jetstack/version-checker/pkg/cache"
+	"github.com/jetstack/version-checker/pkg/client"
+	"github.com/jetstack/version-checker/pkg/controller/architecture"
 	versionerrors "github.com/jetstack/version-checker/pkg/version/errors"
 	"github.com/jetstack/version-checker/pkg/version/semver"
 )
@@ -43,7 +43,7 @@ func (v *Version) Run(refreshRate time.Duration) {
 
 // LatestTagFromImage will return the latest tag given an imageURL, according
 // to the given options.
-func (v *Version) LatestTagFromImage(ctx context.Context, imageURL string, opts *api.Options) (*api.ImageTag, error) {
+func (v *Version) LatestTagFromImage(ctx context.Context, imageURL string, arch architecture.NodeMetadata, opts *api.Options) (*api.ImageTag, error) {
 	if override := opts.OverrideURL; override != nil && len(*override) > 0 {
 		v.log.Debugf("overriding image lookup %s -> %s", imageURL, *override)
 		imageURL = *override
@@ -52,7 +52,10 @@ func (v *Version) LatestTagFromImage(ctx context.Context, imageURL string, opts 
 	if err != nil {
 		return nil, err
 	}
-	tags := tagsI.([]api.ImageTag)
+	tags, err := filterByOSAndArchitecture(tagsI.([]api.ImageTag), arch)
+	if err != nil {
+		return nil, err
+	}
 
 	var tag *api.ImageTag
 
@@ -167,4 +170,14 @@ func latestSHA(tags []api.ImageTag) (*api.ImageTag, error) {
 	}
 
 	return latestTag, nil
+}
+
+func filterByOSAndArchitecture(tags []api.ImageTag, arch architecture.NodeMetadata) ([]api.ImageTag, error) {
+	var filteredTags = make([]api.ImageTag, len(tags))
+	for _, tag := range tags {
+		if tag.OS == arch.OS && tag.Architecture == arch.Architecture {
+			filteredTags = append(filteredTags, tag)
+		}
+	}
+	return filteredTags, nil
 }

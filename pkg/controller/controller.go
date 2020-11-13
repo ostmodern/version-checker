@@ -17,6 +17,7 @@ import (
 	"k8s.io/utils/clock"
 
 	"github.com/jetstack/version-checker/pkg/client"
+	"github.com/jetstack/version-checker/pkg/controller/architecture"
 	"github.com/jetstack/version-checker/pkg/controller/checker"
 	"github.com/jetstack/version-checker/pkg/controller/scheduler"
 	"github.com/jetstack/version-checker/pkg/controller/search"
@@ -37,6 +38,7 @@ type Controller struct {
 	podLister          corev1listers.PodLister
 	workqueue          workqueue.RateLimitingInterface
 	scheduledWorkQueue scheduler.ScheduledWorkQueue
+	nodesArchitecture  architecture.NodeArchitectureMap
 
 	metrics *metrics.Metrics
 	checker *checker.Checker
@@ -56,6 +58,7 @@ func New(
 	scheduledWorkQueue := scheduler.NewScheduledWorkQueue(clock.RealClock{}, workqueue.Add)
 
 	log = log.WithField("module", "controller")
+	nodesArchitecture := architecture.New()
 	versionGetter := version.New(log, imageClient, cacheTimeout)
 	search := search.New(log, cacheTimeout, versionGetter)
 
@@ -65,8 +68,9 @@ func New(
 		workqueue:          workqueue,
 		scheduledWorkQueue: scheduledWorkQueue,
 		metrics:            metrics,
-		checker:            checker.New(search),
+		checker:            checker.New(search, nodesArchitecture),
 		defaultTestAll:     defaultTestAll,
+		nodesArchitecture:  nodesArchitecture,
 	}
 
 	return c
@@ -78,6 +82,7 @@ func (c *Controller) Run(ctx context.Context, cacheRefreshRate time.Duration) er
 
 	sharedInformerFactory := informers.NewSharedInformerFactoryWithOptions(c.kubeClient, time.Second*30)
 	c.podLister = sharedInformerFactory.Core().V1().Pods().Lister()
+	nodeInformer := sharedInformerFactory.Core().V1().Nodes().Informer()
 	podInformer := sharedInformerFactory.Core().V1().Pods().Informer()
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.addObject,
@@ -90,9 +95,35 @@ func (c *Controller) Run(ctx context.Context, cacheRefreshRate time.Duration) er
 		DeleteFunc: c.deleteObject,
 	})
 
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			// Add node info and data to the map
+			err := c.nodesArchitecture.AddNode(obj.(*corev1.Node))
+			if err != nil {
+				// we could log the error
+				return
+			}
+		},
+		UpdateFunc: func(old, new interface{}) {
+			// override the map
+			err := c.nodesArchitecture.AddNode(new.(*corev1.Node))
+			c.log.Info("updating node from node informer")
+			if err != nil {
+				return
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			// remove node from the map
+			err := c.nodesArchitecture.DeleteNode((obj.(*corev1.Node)).Name)
+			if err != nil {
+				return
+			}
+		},
+	})
+
 	c.log.Info("starting control loop")
 	sharedInformerFactory.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), nodeInformer.HasSynced, podInformer.HasSynced) {
 		return fmt.Errorf("error waiting for informer caches to sync")
 	}
 

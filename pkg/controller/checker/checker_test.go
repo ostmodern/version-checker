@@ -5,12 +5,20 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jetstack/version-checker/pkg/controller/architecture"
+
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/jetstack/version-checker/pkg/api"
 	"github.com/jetstack/version-checker/pkg/controller/internal/fake/search"
 	"github.com/jetstack/version-checker/pkg/version/semver"
+)
+
+const (
+	amd64 = "amd64"
+	arm   = "arm/v6"
+	linux = "linux"
 )
 
 func TestContainer(t *testing.T) {
@@ -33,14 +41,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker:v0.2.0",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:456",
+				Tag:          "v0.2.0",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "v0.2.0@sha:123",
 				LatestVersion:  "v0.2.0@sha:456",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if v0.2.0 is latest version, but same sha, then latest": {
@@ -48,14 +60,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker:v0.2.0",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:123",
+				Tag:          "v0.2.0",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "v0.2.0",
 				LatestVersion:  "v0.2.0",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if v0.2.0@sha:123 is wrong sha, then not latest": {
@@ -63,14 +79,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker:v0.2.0@sha:123",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:456",
+				Tag:          "v0.2.0",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "v0.2.0@sha:123",
 				LatestVersion:  "v0.2.0@sha:456",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if v0.2.0@sha:123 is correct sha, then latest": {
@@ -78,14 +98,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker:v0.2.0@sha:123",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:123",
+				Tag:          "v0.2.0",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "v0.2.0@sha:123",
 				LatestVersion:  "v0.2.0@sha:123",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if empty is not latest version, then return false": {
@@ -93,14 +117,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:456",
+				Tag:          "v0.2.0",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "v0.2.0@sha:456",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if empty is latest version, then return true": {
@@ -108,14 +136,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "",
-				SHA: "sha:123",
+				Tag:          "",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "sha:123",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if latest is not latest version, then return false": {
@@ -123,14 +155,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker:latest",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:456",
+				Tag:          "v0.2.0",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "v0.2.0@sha:456",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if latest is latest version, then return true": {
@@ -138,14 +174,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/version-checker:latest",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "",
-				SHA: "sha:123",
+				Tag:          "",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "sha:123",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if using v0.2.0 with use sha, but not latest, return false": {
@@ -155,14 +195,18 @@ func TestContainer(t *testing.T) {
 				UseSHA: true,
 			},
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:456",
+				Tag:          "v0.2.0",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "v0.2.0@sha:123",
 				LatestVersion:  "v0.2.0@sha:456",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if using v0.2.0 with use sha, but latest, return true": {
@@ -172,14 +216,18 @@ func TestContainer(t *testing.T) {
 				UseSHA: true,
 			},
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:123",
+				Tag:          "v0.2.0",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "v0.2.0@sha:123",
 				LatestVersion:  "v0.2.0@sha:123",
 				ImageURL:       "localhost:5000/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if using sha but not latest, return false": {
@@ -187,14 +235,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/joshvanl/version-checker@sha:123",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:456",
+				Tag:          "v0.2.0",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "v0.2.0@sha:456",
 				ImageURL:       "localhost:5000/joshvanl/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if using sha but sha not latest, return false and no tag if non exists": {
@@ -202,14 +254,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/joshvanl/version-checker@sha:123",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "",
-				SHA: "sha:456",
+				Tag:          "",
+				SHA:          "sha:456",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "sha:456",
 				ImageURL:       "localhost:5000/joshvanl/version-checker",
 				IsLatest:       false,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if using sha and is latest, return true": {
@@ -217,14 +273,18 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/joshvanl/version-checker@sha:123",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "v0.2.0",
-				SHA: "sha:123",
+				Tag:          "v0.2.0",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "v0.2.0@sha:123",
 				ImageURL:       "localhost:5000/joshvanl/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 		"if using sha and is latest, return true and no tag if non exists": {
@@ -232,23 +292,38 @@ func TestContainer(t *testing.T) {
 			imageURL:  "localhost:5000/joshvanl/version-checker@sha:123",
 			opts:      new(api.Options),
 			searchResp: &api.ImageTag{
-				Tag: "",
-				SHA: "sha:123",
+				Tag:          "",
+				SHA:          "sha:123",
+				OS:           linux,
+				Architecture: amd64,
 			},
 			expResult: &Result{
 				CurrentVersion: "sha:123",
 				LatestVersion:  "sha:123",
 				ImageURL:       "localhost:5000/joshvanl/version-checker",
 				IsLatest:       true,
+				OS:             linux,
+				Architecture:   amd64,
 			},
 		},
 	}
 
+	architectureMap := architecture.New()
+	node := &corev1.Node{}
+	node.Name = "node1"
+	node.Labels = map[string]string{
+		"kubernetes.io/os":   linux,
+		"kubernetes.io/arch": amd64,
+	}
+	architectureMap.AddNode(node)
+
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-
-			checker := New(search.New().With(test.searchResp, nil))
+			checker := New(search.New().With(test.searchResp, nil), architectureMap)
 			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeName: node.Name,
+				},
 				Status: corev1.PodStatus{
 					ContainerStatuses: []corev1.ContainerStatus{
 						{
@@ -382,7 +457,7 @@ func TestIsLatestOrEmptyTag(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			checker := New(search.New())
+			checker := New(search.New(), architecture.New())
 			if is := checker.isLatestOrEmptyTag(test.tag); is != test.expIs {
 				t.Errorf("unexpected isLatestOrEmptyTag exp=%t got=%t",
 					test.expIs, is)
@@ -459,7 +534,7 @@ func TestIsLatestSemver(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			checker := New(search.New().With(test.searchResp, nil))
+			checker := New(search.New().With(test.searchResp, nil), architecture.New())
 			latestImage, isLatest, err := checker.isLatestSemver(context.TODO(), test.imageURL, test.currentSHA, test.currentImage, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -514,7 +589,7 @@ func TestIsLatestSHA(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			checker := New(search.New().With(test.searchResp, nil))
+			checker := New(search.New().With(test.searchResp, nil), architecture.New())
 			result, err := checker.isLatestSHA(context.TODO(), test.imageURL, test.currentSHA, nil)
 			if err != nil {
 				t.Fatal(err)

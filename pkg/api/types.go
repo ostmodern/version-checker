@@ -37,6 +37,12 @@ const (
 
 	// PinPatchAnnotationKey will pin the patch version to check.
 	PinPatchAnnotationKey = "pin-patch.version-checker.io"
+
+	// PinArchAnnotationKey will only perform checkes on images of that arch
+	PinArchAnnotationKey = "pin-architecture.version-checker.io"
+
+	// PinOsAnnotationKey will only perform checkes on images of that arch
+	PinOsAnnotationKey = "pin-os.version-checker.io"
 )
 
 // Options is used to describe what restrictions should be used for determining
@@ -58,6 +64,10 @@ type Options struct {
 	PinPatch *int64 `json:"pin-patch,omitempty"`
 
 	RegexMatcher *regexp.Regexp `json:"-"`
+
+	// Architecture and OS to search for
+	Architecture *string `json:"pin-architecture,omitempty"`
+	OS           *string `json:"pin-os,omitempty"`
 }
 
 // ImageTag describes a container image tag.

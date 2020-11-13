@@ -103,6 +103,14 @@ func (b *Builder) Options(name string) (*api.Options, error) {
 		}
 	}
 
+	if pinArch, ok := b.ans[b.index(name, api.PinArchAnnotationKey)]; ok {
+		opts.Architecture = &pinArch
+	}
+
+	if pinOS, ok := b.ans[b.index(name, api.PinOsAnnotationKey)]; ok {
+		opts.OS = &pinOS
+	}
+
 	if overrideURL, ok := b.ans[b.index(name, api.OverrideURLAnnotationKey)]; ok {
 		opts.OverrideURL = &overrideURL
 	}

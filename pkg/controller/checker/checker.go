@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/jetstack/version-checker/pkg/api"
+	"github.com/jetstack/version-checker/pkg/controller/architecture"
 	"github.com/jetstack/version-checker/pkg/controller/search"
 	"github.com/jetstack/version-checker/pkg/version/semver"
 	"github.com/sirupsen/logrus"
@@ -15,6 +16,7 @@ import (
 
 type Checker struct {
 	search search.Searcher
+	nodes  architecture.NodeArchitectureMap
 }
 
 type Result struct {
@@ -22,17 +24,32 @@ type Result struct {
 	LatestVersion  string
 	IsLatest       bool
 	ImageURL       string
+	OS             string
+	Architecture   string
 }
 
-func New(search search.Searcher) *Checker {
+func New(search search.Searcher, nodesArchInfo architecture.NodeArchitectureMap) *Checker {
 	return &Checker{
 		search: search,
+		nodes:  nodesArchInfo,
 	}
 }
 
 // Container will return the result of the given container's current version, compared to the latest upstream
 func (c *Checker) Container(ctx context.Context, log *logrus.Entry,
 	pod *corev1.Pod, container *corev1.Container, opts *api.Options) (*Result, error) {
+
+	if opts != nil {
+		// Get information about the pod node architecture
+		if opts.OS == nil || opts.Architecture == nil {
+			arch, err := c.nodes.GetNodeArchitecture(pod.Spec.NodeName)
+			if err != nil {
+				return nil, err
+			}
+			opts.OS = &arch.OS
+			opts.Architecture = &arch.Architecture
+		}
+	}
 
 	// If the container image SHA status is not ready yet, exit early
 	statusSHA := containerStatusImageSHA(pod, container.Name)
@@ -90,6 +107,8 @@ func (c *Checker) Container(ctx context.Context, log *logrus.Entry,
 		LatestVersion:  latestVersion,
 		IsLatest:       isLatest,
 		ImageURL:       imageURL,
+		OS:             latestImage.OS,
+		Architecture:   latestImage.Architecture,
 	}, nil
 }
 
@@ -161,6 +180,8 @@ func (c *Checker) isLatestSHA(ctx context.Context, imageURL, currentSHA string, 
 		LatestVersion:  latestVersion,
 		IsLatest:       isLatest,
 		ImageURL:       imageURL,
+		OS:             latestImage.OS,
+		Architecture:   latestImage.Architecture,
 	}, nil
 }
 

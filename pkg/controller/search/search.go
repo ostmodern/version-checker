@@ -11,6 +11,7 @@ import (
 
 	"github.com/jetstack/version-checker/pkg/api"
 	"github.com/jetstack/version-checker/pkg/cache"
+	"github.com/jetstack/version-checker/pkg/controller/architecture"
 	"github.com/jetstack/version-checker/pkg/version"
 )
 
@@ -41,7 +42,11 @@ func New(log *logrus.Entry, cacheTimeout time.Duration, versionGetter *version.V
 }
 
 func (s *Search) Fetch(ctx context.Context, imageURL string, opts *api.Options) (interface{}, error) {
-	latestImage, err := s.versionGetter.LatestTagFromImage(ctx, imageURL, opts)
+	latestImage, err := s.versionGetter.LatestTagFromImage(ctx, imageURL,
+		architecture.NodeMetadata{
+			OS:           *opts.OS,
+			Architecture: *opts.Architecture,
+		}, opts)
 	if err != nil {
 		return nil, err
 	}
